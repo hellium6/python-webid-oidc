@@ -169,7 +169,7 @@ def check_password(password, pwhash):
 def b64u_hmacsha512(key, msg):
 	return b64u_encode(hmac.new(as_bytes(key), as_bytes(msg), digestmod=hashlib.sha512).digest())
 
-def make_id_token(webid, client_id, auth_time, nonce = None, access_token = None, code=None, lifetime = args.token_lifetime, redirect_uri=None, cnf=None):
+def make_id_token(webid, client_id, auth_time, nonce = None, access_token = None, code=None, lifetime = args.token_lifetime, redirect_uri=None, cnf=None, email=None):
 	now = time.time()
 	aud = [ client_id ]
 	if redirect_uri:
@@ -194,6 +194,8 @@ def make_id_token(webid, client_id, auth_time, nonce = None, access_token = None
 		token['c_hash'] = b64u_encode(hashlib.sha256(as_bytes(code)).digest()[:16])
 	if cnf:
 		token['cnf'] = cnf
+	if email:
+		token['email'] = email
 	return make_jwt(token)
 
 def random_token():
@@ -374,7 +376,7 @@ class OIDCRequestHandler(BaseHTTPRequestHandler):
 			"response_types_supported": ["code", "id_token", "code id_token", "token id_token", "code id_token token"],
 			"subject_types_supported": ["public"],
 			"id_token_signing_alg_values_supported": [ "RS256" ],
-			"scopes_supported": [ "openid", "webid" ],
+			"scopes_supported": [ "openid", "webid", "email" ],
 			"grant_types_supported": [ "authorization_code", "implicit" ],
 			"userinfo_endpoint": args.url + self.USERINFO,
 			"request_parameter_supported": True,
@@ -602,7 +604,7 @@ class OIDCRequestHandler(BaseHTTPRequestHandler):
 		code = random_token() if 'code' in response_types else None
 		access_token = random_token() if code or 'token' in response_types else None
 		id_token = make_id_token(session_user['webid'], client_id, authed_on, nonce=nonce, cnf=cnf,
-			access_token=access_token, code=code, redirect_uri=redirect_uri if "webid" in scopes else None)
+			access_token=access_token, code=code, redirect_uri=redirect_uri if "webid" in scopes else None, email=session_user['email'] if "email" in scopes else None)
 		response_query = dict(state=state, code=code, expires_in=args.token_lifetime, scope="openid webid")
 		if 'id_token' in response_types:
 			response_query['id_token'] = id_token
