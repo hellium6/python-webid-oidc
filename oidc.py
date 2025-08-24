@@ -288,6 +288,7 @@ def dirty_jwt_get_unverified_claims(jwt):
 
 class OIDCRequestHandler(BaseHTTPRequestHandler):
 	CONFIG     = '.well-known/openid-configuration'
+	WEBFINGER  = '.well-known/webfinger'
 	AUTHORIZE  = 'authorize'
 	TOKEN      = 'token'
 	JWKS       = 'jwks'
@@ -379,6 +380,25 @@ class OIDCRequestHandler(BaseHTTPRequestHandler):
 			"userinfo_endpoint": args.url + self.USERINFO,
 			"request_parameter_supported": True,
 			"request_uri_parameter_supported": False
+		}, cors=True)
+
+	def answer_webfinger_config(self):
+		session_user = None
+		cookie = self.get_cookie()
+		if cookie:
+			session_user = db.cursor().execute("SELECT session.id as session_id, * FROM session JOIN user ON session.user = user.id WHERE session.cookie = ?", (cookie, )).fetchone()
+		# if not logged in, the value would be blank
+		user_email = ""
+		if session_user:
+			user_email = session_user['email']
+		return self.answer_json({
+			"subject": "acct:" + user_email,
+			"links": [
+				{
+					"rel": "http://openid.net/specs/connect/1.0/issuer",
+					"href": args.url,
+				}
+			]
 		}, cors=True)
 
 	def answer_jwks(self):
@@ -668,6 +688,8 @@ class OIDCRequestHandler(BaseHTTPRequestHandler):
 
 			if   path == self.CONFIG:
 				return self.answer_openid_config()
+			elif path == self.WEBFINGER:
+				return self.answer_webfinger_config()
 			elif path == self.JWKS:
 				return self.answer_jwks()
 			elif path == self.LOGOUT:
